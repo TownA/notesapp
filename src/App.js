@@ -6,7 +6,7 @@ import { listNotes } from './graphql/queries';
 import { v4 as uuid } from 'uuid';
 import { List, Input, Button } from 'antd';
 import { createNote as CreateNote, deleteNote as DeleteNote, updateNote as UpdateNote } from './graphql/mutations';
-import { onCreateNote } from './graphql/subscriptions';
+import { onCreateNote, onUpdateNote, onDeleteNote } from './graphql/subscriptions';
 
 const CLIENT_ID = uuid();
 
@@ -58,7 +58,6 @@ const App = () => {
       const note = { ...form, clientId: CLIENT_ID, completed: false, id: uuid() }
       dispatch({ type: 'ADD_NOTE', note });
       dispatch({ type: 'RESET_FORM' });
-
       try {
         await API.graphql({
           query: CreateNote,
@@ -109,9 +108,7 @@ const App = () => {
 
     useEffect(() => {
       fetchNotes();
-      const subscription = API.graphql({
-        query: onCreateNote
-      })
+      const createNoteSubscription = API.graphql({ query: onCreateNote })
         .subscribe({
           next: noteData => {
             const note = noteData.value.data.onCreateNote
@@ -119,7 +116,7 @@ const App = () => {
             dispatch({ type: 'ADD_NOTE', note })
           }
         })
-        return () => subscription.unsubscribe()
+        return () => createNoteSubscription.unsubscribe();
     }, []);
 
     const styles = {
