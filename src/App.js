@@ -5,7 +5,8 @@ import './App.css';
 import { listNotes } from './graphql/queries';
 import { v4 as uuid } from 'uuid';
 import { List, Input, Button } from 'antd';
-import { createNote as CreateNote, deleteNote as DeleteNote } from './graphql/mutations';
+import { createNote as CreateNote, deleteNote as DeleteNote, updateNote as UpdateNote } from './graphql/mutations';
+import { onCreateNote } from './graphql/subscriptions';
 
 const CLIENT_ID = uuid();
 
@@ -85,6 +86,22 @@ const App = () => {
           console.log(err)
       }
     };
+    
+    const updateNote = async(note) => {
+      const index = state.notes.findIndex(n => n.id === note.id)
+      const notes = [...state.notes]
+      notes[index].completed = !note.completed
+      dispatch({ type: 'SET_NOTES', notes})
+      try {
+        await API.graphql({
+          query: UpdateNote,
+          variables: { input: { id: note.id, completed: notes[index].completed } }
+        })
+        console.log('note successfully updated!')
+      } catch (err) {
+        console.log('error: ', err)
+      }
+    };
 
     const onChange = (e) => {
       dispatch({ type: 'SET_INPUT', name: e.target.name, value: e.target.value })
@@ -92,6 +109,17 @@ const App = () => {
 
     useEffect(() => {
       fetchNotes();
+      const subscription = API.graphql({
+        query: onCreateNote
+      })
+        .subscribe({
+          next: noteData => {
+            const note = noteData.value.data.onCreateNote
+            if (CLIENT_ID === note.clientId) return
+            dispatch({ type: 'ADD_NOTE', note })
+          }
+        })
+        return () => subscription.unsubscribe()
     }, []);
 
     const styles = {
@@ -104,8 +132,11 @@ const App = () => {
     const renderItem = (item) => {
       return (
         <List.Item style={styles.item}
-          actions={[<p style={styles.p} onClick={() => deleteNote(item)}>Delete</p>]}>
-            
+          actions={[<p style={styles.p} onClick={() => deleteNote(item)}>Delete</p>,  
+          <p style={styles.p} onClick={() => updateNote(item)}>
+            {item.completed ? 'completed' : 'mark completed'}</p>
+          ]}>
+
           <List.Item.Meta
             title={item.name}
             description={item.description}
